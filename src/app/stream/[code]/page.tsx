@@ -253,10 +253,19 @@ export default function StreamerDashboardPage() {
       return;
     }
     
+    // Store the start time and duration to avoid recalculating on every render
+    const gameStartTime = game.startedAt;
+    const gameDuration = game.settings.gameDurationMinutes;
+    
+    console.log('[Timer] Game started at:', new Date(gameStartTime).toLocaleTimeString());
+    console.log('[Timer] Current time:', new Date().toLocaleTimeString());
+    console.log('[Timer] Game duration:', gameDuration, 'minutes');
+    console.log('[Timer] Elapsed since start:', Math.floor((Date.now() - gameStartTime) / 1000), 'seconds');
+    
     const updateTimer = () => {
       const now = Date.now();
-      const elapsedMs = now - game.startedAt!;
-      const durationMs = game.settings!.gameDurationMinutes * 60 * 1000;
+      const elapsedMs = now - gameStartTime;
+      const durationMs = gameDuration * 60 * 1000;
       const remainingMs = Math.max(0, durationMs - elapsedMs);
       const remainingSec = Math.ceil(remainingMs / 1000);
       
@@ -274,7 +283,7 @@ export default function StreamerDashboardPage() {
     const timerInterval = setInterval(updateTimer, 1000); // Update every second
     
     return () => clearInterval(timerInterval);
-  }, [game, code, fetchGame]);
+  }, [game?.status, game?.startedAt, game?.settings?.gameDurationMinutes, code, fetchGame]);
 
   useEffect(() => {
     if (!code || !name) {
