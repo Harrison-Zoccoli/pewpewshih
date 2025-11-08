@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
 interface CameraFeedProps {
-  onHit: (targetColor: { r: number; g: number; b: number }) => void;
+  onHit: (didHit: boolean, targetColor?: { r: number; g: number; b: number }) => void;
   showBoundingBoxes: boolean;
   isActive: boolean;
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
@@ -476,6 +476,8 @@ export default function CameraFeed({ onHit, showBoundingBoxes, isActive, canvasR
     const y = canvas.height / 2;
 
     const hitZones = limbHitZonesRef.current;
+    let didHitSomeone = false;
+    let hitColor: { r: number; g: number; b: number } | undefined;
     
     for (let i = 0; i < hitZones.length; i++) {
       const person = hitZones[i];
@@ -486,9 +488,10 @@ export default function CameraFeed({ onHit, showBoundingBoxes, isActive, canvasR
         );
         
         if (distance <= circle.radius) {
-          onHit(person.color);
+          didHitSomeone = true;
+          hitColor = person.color;
           
-          // Visual feedback
+          // Visual feedback for HIT
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
@@ -514,10 +517,16 @@ export default function CameraFeed({ onHit, showBoundingBoxes, isActive, canvasR
             ctx.stroke();
           }
           
-          return;
+          // Don't return early - still need to call onHit at the end
+          break; // Exit inner loop
         }
       }
+      if (didHitSomeone) break; // Exit outer loop if we hit someone
     }
+    
+    // Always call onHit, whether we hit someone or not
+    // This ensures ammo is consumed on every shot
+    onHit(didHitSomeone, hitColor);
   };
 
   if (cameraError) {

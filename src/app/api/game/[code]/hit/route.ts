@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updatePlayerScore } from "@/lib/gameStore";
+import { updatePlayerScore, getGame } from "@/lib/gameStore";
 
 export async function POST(
   request: NextRequest,
@@ -17,8 +17,22 @@ export async function POST(
       );
     }
 
-    // Each hit = 1 point
-    const game = updatePlayerScore(code, playerName, 1);
+    // Get the player's current selected gun to determine point multiplier
+    const gameData = getGame(code);
+    const player = gameData.players.find(
+      (p) => p.name.toLowerCase() === playerName.toLowerCase()
+    );
+    
+    if (!player) {
+      return NextResponse.json(
+        { error: "Player not found." },
+        { status: 404 },
+      );
+    }
+    
+    // Award points based on gun type (client already consumed ammo)
+    const pointsMultiplier = player.selectedGun === 2 ? 3 : 1;
+    const game = updatePlayerScore(code, playerName, pointsMultiplier);
 
     return NextResponse.json(game);
   } catch (error) {

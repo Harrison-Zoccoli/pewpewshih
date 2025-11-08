@@ -82,7 +82,10 @@ function handleMessage(socket, raw, state) {
   }
 
   if (parsed.type === 'register') {
-    if (state.role) return;
+    if (state.role) {
+      console.log(`[Signaling] Ignoring duplicate registration for ${state.name}`);
+      return;
+    }
 
     state.role = parsed.role;
     state.code = parsed.code.toUpperCase();
@@ -91,7 +94,9 @@ function handleMessage(socket, raw, state) {
     const room = getRoom(state.code);
 
     if (state.role === 'streamer') {
+      console.log(`[Signaling] Registering streamer "${state.name}" for game ${state.code}`);
       if (room.streamer && room.streamer !== socket) {
+        console.log(`[Signaling] Rejecting streamer - already connected`);
         socket.send(
           JSON.stringify({
             type: 'error',
@@ -103,6 +108,7 @@ function handleMessage(socket, raw, state) {
       }
       room.streamer = socket;
       room.streamerName = state.name;
+      console.log(`[Signaling] Streamer registered. Existing players: ${Array.from(room.players.keys()).join(', ')}`);
       socket.send(
         JSON.stringify({
           type: 'registered',
@@ -112,6 +118,7 @@ function handleMessage(socket, raw, state) {
       );
       room.players.forEach((player) => {
         if (player.socket.readyState === 1) {
+          console.log(`[Signaling] Notifying player ${player.name} that streamer is ready`);
           player.socket.send(JSON.stringify({ type: 'streamer-ready' }));
         }
       });
@@ -119,6 +126,7 @@ function handleMessage(socket, raw, state) {
     }
 
     // player registration
+    console.log(`[Signaling] Registering player "${state.name}" for game ${state.code}. Streamer present: ${Boolean(room.streamer)}`);
     room.players.set(state.name, { name: state.name, socket });
     socket.send(
       JSON.stringify({
@@ -128,6 +136,7 @@ function handleMessage(socket, raw, state) {
       }),
     );
     if (room.streamer && room.streamer.readyState === 1) {
+      console.log(`[Signaling] Notifying streamer that player ${state.name} joined`);
       room.streamer.send(JSON.stringify({ type: 'player-joined', name: state.name }));
       socket.send(JSON.stringify({ type: 'streamer-ready' }));
     }
@@ -148,7 +157,11 @@ function handleMessage(socket, raw, state) {
 
   switch (parsed.type) {
     case 'offer': {
-      if (state.role !== 'player' || !room.streamer) return;
+      if (state.role !== 'player' || !room.streamer) {
+        console.log(`[Signaling] Offer from ${state.name} ignored - not a player or no streamer`);
+        return;
+      }
+      console.log(`[Signaling] Forwarding offer from player ${state.name} to streamer`);
       if (room.streamer.readyState === 1) {
         room.streamer.send(
           JSON.stringify({
@@ -157,11 +170,17 @@ function handleMessage(socket, raw, state) {
             offer: parsed.offer,
           }),
         );
+      } else {
+        console.log(`[Signaling] Warning: Streamer socket not open (readyState: ${room.streamer.readyState})`);
       }
       break;
     }
     case 'answer': {
-      if (state.role !== 'streamer') return;
+      if (state.role !== 'streamer') {
+        console.log(`[Signaling] Answer from ${state.name} ignored - not a streamer`);
+        return;
+      }
+      console.log(`[Signaling] Forwarding answer from streamer to player ${parsed.name}`);
       const target = room.players.get(parsed.name);
       if (target && target.socket.readyState === 1) {
         target.socket.send(
@@ -171,11 +190,14 @@ function handleMessage(socket, raw, state) {
             answer: parsed.answer,
           }),
         );
+      } else {
+        console.log(`[Signaling] Warning: Target player ${parsed.name} not found or socket not open`);
       }
       break;
     }
     case 'candidate': {
       if (state.role === 'player') {
+        console.log(`[Signaling] ICE candidate from player ${state.name} -> streamer`);
         if (room.streamer && room.streamer.readyState === 1) {
           room.streamer.send(
             JSON.stringify({
@@ -184,8 +206,11 @@ function handleMessage(socket, raw, state) {
               candidate: parsed.candidate,
             }),
           );
+        } else {
+          console.log(`[Signaling] Warning: Streamer not available for ICE candidate from ${state.name}`);
         }
       } else if (state.role === 'streamer') {
+        console.log(`[Signaling] ICE candidate from streamer -> player ${parsed.name}`);
         const target = room.players.get(parsed.name);
         if (target && target.socket.readyState === 1) {
           target.socket.send(
@@ -195,15 +220,19 @@ function handleMessage(socket, raw, state) {
               candidate: parsed.candidate,
             }),
           );
+        } else {
+          console.log(`[Signaling] Warning: Player ${parsed.name} not found or socket not open`);
         }
       }
       break;
     }
     case 'leave': {
+      console.log(`[Signaling] ${state.role} ${state.name} leaving game ${state.code}`);
       cleanupConnection(state.code, state.role, state.name, socket);
       break;
     }
     default:
+      console.log(`[Signaling] Unknown message type: ${parsed.type} from ${state.name}`);
       break;
   }
 }
@@ -224,17 +253,48 @@ app.prepare().then(() => {
 
   wss.on('connection', (ws) => {
     const state = {};
+    const connectionId = Math.random().toString(36).substring(7);
+    console.log(`[WS ${connectionId}] New WebSocket connection established`);
 
     ws.on('message', (data) => {
-      handleMessage(ws, data.toString(), state);
+      const dataStr = data.toString();
+      try {
+        const parsed = JSON.parse(dataStr);
+        console.log(`[WS ${connectionId}] Received message:`, parsed.type, {
+          role: state.role || 'not-registered',
+          name: state.name || 'unknown',
+          code: state.code || 'none'
+        });
+        handleMessage(ws, dataStr, state);
+      } catch (err) {
+        console.error(`[WS ${connectionId}] Error handling message:`, err.message);
+        handleMessage(ws, dataStr, state);
+      }
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
+      console.log(`[WS ${connectionId}] Connection closed:`, {
+        code,
+        reason: reason.toString(),
+        role: state.role,
+        name: state.name,
+        gameCode: state.code
+      });
       cleanupConnection(state.code, state.role, state.name, ws);
     });
 
-    ws.on('error', () => {
+    ws.on('error', (error) => {
+      console.error(`[WS ${connectionId}] WebSocket error:`, {
+        message: error.message,
+        role: state.role,
+        name: state.name,
+        gameCode: state.code
+      });
       cleanupConnection(state.code, state.role, state.name, ws);
+    });
+
+    ws.on('pong', () => {
+      console.log(`[WS ${connectionId}] Pong received from ${state.name || 'unknown'}`);
     });
   });
 

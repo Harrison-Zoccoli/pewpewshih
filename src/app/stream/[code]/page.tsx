@@ -432,27 +432,19 @@ export default function StreamerDashboardPage() {
                   key={`${player.name}-${player.joinedAt}`}
                   className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-lg font-black text-fuchsia-200">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span className="rounded-full bg-slate-900/60 px-3 py-1 text-sm font-semibold text-fuchsia-100">
-                      {player.score}
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-2 text-left">
-                    <p className="text-base font-semibold text-white leading-tight">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-base font-semibold text-white flex-1">
                       {player.name}
                       {player.isHost ? (
-                        <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.3em] text-emerald-200">
+                        <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-emerald-200">
                           Host
                         </span>
                       ) : null}
                     </p>
-                    <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">
-                      Joined {new Date(player.joinedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
                   </div>
+                  <p className="mt-2 text-3xl font-black text-cyan-300">
+                    {player.score}
+                  </p>
                 </div>
               ))}
               {(game?.players?.length ?? 0) === 0 ? (
@@ -471,7 +463,7 @@ export default function StreamerDashboardPage() {
               </p>
             </div>
             <div
-              className="mt-4 grid flex-1 gap-3 overflow-auto content-start min-h-0"
+              className="mt-4 grid flex-1 gap-3 overflow-auto content-start min-h-0 justify-items-center"
               data-feed-version={feedVersion}
               style={{
                 gridTemplateColumns: (() => {
@@ -486,7 +478,8 @@ export default function StreamerDashboardPage() {
                   if (count === 8) return 'repeat(4, 1fr)';
                   if (count === 9) return 'repeat(3, 1fr)';
                   return 'repeat(4, 1fr)';
-                })()
+                })(),
+                gridAutoFlow: 'dense'
               }}
             >
               {(game?.players ?? []).map((player) => {
