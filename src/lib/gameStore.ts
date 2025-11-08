@@ -23,6 +23,12 @@ export type PublicStreamer = Omit<Streamer, "id">;
 
 export type GameStatus = "waiting" | "active";
 
+type GameSettings = {
+  showBoundingBoxes: boolean;
+};
+
+export type PublicGameSettings = GameSettings;
+
 export type PublicGame = {
   code: string;
   status: GameStatus;
@@ -30,6 +36,7 @@ export type PublicGame = {
   createdAt: number;
   startedAt?: number;
   streamer?: PublicStreamer;
+  settings: PublicGameSettings;
 };
 
 type Game = {
@@ -39,6 +46,7 @@ type Game = {
   startedAt?: number;
   status: GameStatus;
   streamer?: Streamer;
+  settings: GameSettings;
 };
 
 const games = new Map<string, Game>();
@@ -84,6 +92,7 @@ function toPublicGame(game: Game): PublicGame {
           joinedAt: game.streamer.joinedAt,
         }
       : undefined,
+    settings: game.settings,
   };
 }
 
@@ -108,6 +117,9 @@ export function createGame(hostNameInput: string | undefined) {
     players: [host],
     createdAt: now,
     status: "waiting",
+    settings: {
+      showBoundingBoxes: true,
+    },
   };
 
   games.set(code, game);
@@ -244,6 +256,64 @@ export function unregisterStreamer(codeInput: string) {
   }
 
   game.streamer = undefined;
+
+  return toPublicGame(game);
+}
+
+export function updatePlayerScore(
+  codeInput: string,
+  playerName: string,
+  pointsToAdd: number,
+) {
+  const code = normalizeCode(codeInput);
+  const normalizedPlayerName = normalizeName(playerName);
+
+  if (!code) {
+    throw new Error("Game code is required.");
+  }
+
+  const game = games.get(code);
+  if (!game) {
+    throw new Error("Game not found.");
+  }
+
+  const player = game.players.find(
+    (p) => p.name.toLowerCase() === normalizedPlayerName.toLowerCase(),
+  );
+
+  if (!player) {
+    throw new Error("Player not found in this game.");
+  }
+
+  player.score += pointsToAdd;
+
+  return toPublicGame(game);
+}
+
+export function updateGameSettings(
+  codeInput: string,
+  hostName: string,
+  settings: Partial<GameSettings>,
+) {
+  const code = normalizeCode(codeInput);
+  const normalizedHostName = normalizeName(hostName);
+
+  if (!code) {
+    throw new Error("Game code is required.");
+  }
+
+  const game = games.get(code);
+  if (!game) {
+    throw new Error("Game not found.");
+  }
+
+  const host = game.players.find((p) => p.isHost);
+
+  if (!host || host.name.toLowerCase() !== normalizedHostName.toLowerCase()) {
+    throw new Error("Only the host can change game settings.");
+  }
+
+  game.settings = { ...game.settings, ...settings };
 
   return toPublicGame(game);
 }

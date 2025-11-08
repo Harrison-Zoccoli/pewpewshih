@@ -35,6 +35,8 @@ export default function LobbyPage() {
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const hasRequestedCamera = useRef(false);
+  const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const fetchLobby = useCallback(async () => {
     if (!code) {
@@ -57,6 +59,7 @@ export default function LobbyPage() {
 
       setPlayers(sortedPlayers);
       setGameStatus((data.status as GameStatus) ?? "waiting");
+      setShowBoundingBoxes(data.settings?.showBoundingBoxes ?? true);
       setFetchState("ready");
       setError(null);
     } catch (err) {
@@ -177,6 +180,33 @@ export default function LobbyPage() {
     }
   }, [code]);
 
+  const handleToggleBoundingBoxes = useCallback(async () => {
+    try {
+      setSettingsError(null);
+      const newValue = !showBoundingBoxes;
+      
+      const response = await fetch(`/api/game/${code}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hostName: localName,
+          settings: { showBoundingBoxes: newValue },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to update settings.");
+      }
+
+      setShowBoundingBoxes(newValue);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update settings.";
+      setSettingsError(message);
+    }
+  }, [code, localName, showBoundingBoxes]);
+
   const lobbyMessage = useMemo(() => {
     if (fetchState === "loading") return "Setting up your lobby...";
     if (fetchState === "missing") return "We couldn’t find that lobby.";
@@ -284,28 +314,62 @@ export default function LobbyPage() {
         </section>
 
         {isHost ? (
-          <section className="flex flex-col items-center gap-6 rounded-3xl border border-dashed border-emerald-500/40 bg-emerald-500/5 p-8 text-center text-sm text-emerald-200">
+          <>
             {gameStatus === "waiting" ? (
-              <>
+              <section className="rounded-3xl border border-white/5 bg-white/5 p-8 shadow-xl backdrop-blur">
+                <h2 className="text-xl font-semibold text-white mb-6">Game Settings</h2>
+                <div className="space-y-4">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <p className="text-base font-medium text-white">Show bounding boxes</p>
+                      <p className="text-sm text-slate-400">Display person detection overlays during the match</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleToggleBoundingBoxes}
+                      className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
+                        showBoundingBoxes ? 'bg-emerald-500' : 'bg-slate-700'
+                      }`}
+                      role="switch"
+                      aria-checked={showBoundingBoxes}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          showBoundingBoxes ? 'translate-x-6' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </label>
+                  {settingsError ? (
+                    <p className="text-sm text-rose-300">{settingsError}</p>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+            
+            <section className="flex flex-col items-center gap-6 rounded-3xl border border-dashed border-emerald-500/40 bg-emerald-500/5 p-8 text-center text-sm text-emerald-200">
+              {gameStatus === "waiting" ? (
+                <>
+                  <p className="text-base text-emerald-100">
+                    Ready to battle? Launching the match will transport every
+                    player into their Pew Pew HUD.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleStartGame}
+                    disabled={isStarting}
+                    className="rounded-full bg-emerald-400 px-10 py-3 text-base font-semibold uppercase tracking-[0.4em] text-emerald-950 shadow-lg shadow-emerald-500/40 transition hover:bg-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isStarting ? "Syncing..." : "Start match"}
+                  </button>
+                </>
+              ) : (
                 <p className="text-base text-emerald-100">
-                  Ready to battle? Launching the match will transport every
-                  player into their Pew Pew HUD.
+                  Match is live. HUDs should be active on every device.
                 </p>
-                <button
-                  type="button"
-                  onClick={handleStartGame}
-                  disabled={isStarting}
-                  className="rounded-full bg-emerald-400 px-10 py-3 text-base font-semibold uppercase tracking-[0.4em] text-emerald-950 shadow-lg shadow-emerald-500/40 transition hover:bg-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isStarting ? "Syncing..." : "Start match"}
-                </button>
-              </>
-            ) : (
-              <p className="text-base text-emerald-100">
-                Match is live. HUDs should be active on every device.
-              </p>
-            )}
-          </section>
+              )}
+            </section>
+          </>
         ) : (
           <section className="rounded-3xl border border-sky-500/20 bg-sky-500/5 p-8 text-center text-sm text-sky-200">
             Hang tight. The host will launch the match from their console. Your

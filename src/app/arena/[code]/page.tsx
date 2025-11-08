@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import CameraFeed from "@/components/CameraFeed";
+import type { PublicGame } from "@/lib/gameStore";
 
 type OutboundMessage =
   | { type: "register"; code: string; name: string; role: "player" }
@@ -35,7 +37,7 @@ export default function ArenaPage() {
   const playerName = searchParams.get("name") ?? "";
   const isHost = searchParams.get("host") === "1";
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -43,53 +45,54 @@ export default function ArenaPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [signalingStatus, setSignalingStatus] = useState<string | null>(null);
   const [streamerReady, setStreamerReady] = useState(false);
+  const [game, setGame] = useState<PublicGame | null>(null);
+  const [playerScore, setPlayerScore] = useState(0);
+  const [cameraReady, setCameraReady] = useState(false);
 
+  // Poll game state to get settings and scores
   useEffect(() => {
-    let active = true;
-    let mediaStream: MediaStream | null = null;
-
-    const startStream = async () => {
-      if (!navigator.mediaDevices?.getUserMedia || !window.isSecureContext) {
-        setStreamError(
-          "Camera access needs HTTPS and a supported browser. Re-open Pew Pew over a secure connection.",
-        );
-        return;
-      }
-
+    const pollGame = async () => {
       try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-          audio: false,
-        });
-
-        if (!active) {
-          mediaStream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-
-        localStreamRef.current = mediaStream;
-        const videoElement = videoRef.current;
-        if (videoElement) {
-          videoElement.srcObject = mediaStream;
-          await videoElement.play().catch(() => undefined);
-          setIsStreaming(true);
+        const res = await fetch(`/api/game/${code}`);
+        const data = await res.json();
+        setGame(data);
+        
+        // Update player's score
+        const player = data.players?.find(
+          (p: any) => p.name.toLowerCase() === playerName.toLowerCase()
+        );
+        if (player) {
+          setPlayerScore(player.score);
         }
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Unable to access camera.";
-        setStreamError(message);
+        console.error("Failed to fetch game state", err);
       }
     };
+    
+    pollGame();
+    const interval = setInterval(pollGame, 3000);
+    
+    return () => clearInterval(interval);
+  }, [code, playerName]);
 
-    void startStream();
+  // Set up canvas streaming for WebRTC once canvas is ready
+  useEffect(() => {
+    if (!cameraReady || !canvasRef.current) {
+      return;
+    }
 
-    return () => {
-      active = false;
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
+    try {
+      // Capture the canvas as a MediaStream for WebRTC
+      const canvas = canvasRef.current;
+      const stream = canvas.captureStream(30); // 30 FPS
+      localStreamRef.current = stream;
+      setIsStreaming(true);
+      console.log('Canvas stream captured for WebRTC');
+    } catch (err) {
+      console.error('Failed to capture canvas stream:', err);
+      setStreamError('Unable to stream canvas to control booth.');
+    }
+  }, [cameraReady]);
 
   const sendMessage = useCallback((message: OutboundMessage) => {
     const socket = wsRef.current;
@@ -276,6 +279,29 @@ export default function ArenaPage() {
     };
   }, [startStreaming, streamerReady]);
 
+  // Handle hits from CameraFeed
+  const handleHit = useCallback(async (targetColor: { r: number; g: number; b: number }) => {
+    try {
+      const res = await fetch(`/api/game/${code}/hit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerName, targetColor }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        const player = data.players?.find(
+          (p: any) => p.name.toLowerCase() === playerName.toLowerCase()
+        );
+        if (player) {
+          setPlayerScore(player.score);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to register hit", err);
+    }
+  }, [code, playerName]);
+
   const statusMessage = useMemo(() => {
     if (streamError) return streamError;
     if (signalingStatus) return signalingStatus;
@@ -318,12 +344,13 @@ export default function ArenaPage() {
       </header>
       <main className="relative flex flex-1 flex-col items-center justify-center px-6 pb-32">
         <div className="relative w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-black/40 shadow-2xl">
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            autoPlay
-            className="aspect-video w-full object-cover"
+          {/* MediaPipe CameraFeed with person detection */}
+          <CameraFeed
+            onHit={handleHit}
+            showBoundingBoxes={game?.settings?.showBoundingBoxes ?? true}
+            isActive={true}
+            canvasRef={canvasRef}
+            onCameraReady={() => setCameraReady(true)}
           />
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-6 text-sm text-slate-200">
             {statusMessage}
@@ -333,6 +360,13 @@ export default function ArenaPage() {
       <footer className="sticky bottom-0 flex justify-center bg-gradient-to-t from-black/80 via-black/60 to-transparent pb-10 pt-6">
         <button
           type="button"
+          onClick={() => {
+            // Trigger a click on the canvas
+            const canvas = canvasRef.current;
+            if (canvas) {
+              canvas.click();
+            }
+          }}
           className="relative flex h-20 w-56 items-center justify-center rounded-full bg-gradient-to-r from-rose-500 via-fuchsia-500 to-sky-500 text-lg font-bold uppercase tracking-[0.6em] text-white shadow-[0_0_40px_rgba(236,72,153,0.5)] transition hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-rose-200"
         >
           Fire
