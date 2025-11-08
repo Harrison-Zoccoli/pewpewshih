@@ -12,7 +12,7 @@ type Player = {
 };
 
 type LobbyFetchState = "loading" | "ready" | "missing" | "error";
-type GameStatus = "waiting" | "active";
+type GameStatus = "waiting" | "active" | "ended";
 type CameraStatus = "idle" | "requesting" | "granted" | "denied" | "unsupported";
 
 export default function LobbyPage() {
@@ -36,6 +36,7 @@ export default function LobbyPage() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const hasRequestedCamera = useRef(false);
   const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
+  const [gameDuration, setGameDuration] = useState(3); // Default 3 minutes
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const fetchLobby = useCallback(async () => {
@@ -60,6 +61,7 @@ export default function LobbyPage() {
       setPlayers(sortedPlayers);
       setGameStatus((data.status as GameStatus) ?? "waiting");
       setShowBoundingBoxes(data.settings?.showBoundingBoxes ?? true);
+      setGameDuration(data.settings?.gameDurationMinutes ?? 3);
       setFetchState("ready");
       setError(null);
     } catch (err) {
@@ -206,6 +208,32 @@ export default function LobbyPage() {
       setSettingsError(message);
     }
   }, [code, localName, showBoundingBoxes]);
+  
+  const handleGameDurationChange = useCallback(async (minutes: number) => {
+    try {
+      setSettingsError(null);
+      
+      const response = await fetch(`/api/game/${code}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hostName: localName,
+          settings: { gameDurationMinutes: minutes },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to update settings.");
+      }
+
+      setGameDuration(minutes);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update settings.";
+      setSettingsError(message);
+    }
+  }, [code, localName]);
 
   const lobbyMessage = useMemo(() => {
     if (fetchState === "loading") return "Setting up your lobby...";
@@ -318,7 +346,7 @@ export default function LobbyPage() {
             {gameStatus === "waiting" ? (
               <section className="rounded-3xl border border-white/5 bg-white/5 p-8 shadow-xl backdrop-blur">
                 <h2 className="text-xl font-semibold text-white mb-6">Game Settings</h2>
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <label className="flex items-center justify-between cursor-pointer">
                     <div>
                       <p className="text-base font-medium text-white">Show bounding boxes</p>
@@ -340,6 +368,30 @@ export default function LobbyPage() {
                       />
                     </button>
                   </label>
+                  
+                  <div>
+                    <div className="mb-3">
+                      <p className="text-base font-medium text-white">Game duration</p>
+                      <p className="text-sm text-slate-400">How long the match will last</p>
+                    </div>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 5, 10].map((minutes) => (
+                        <button
+                          key={minutes}
+                          type="button"
+                          onClick={() => handleGameDurationChange(minutes)}
+                          className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                            gameDuration === minutes
+                              ? 'bg-emerald-500 text-white shadow-lg'
+                              : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                          }`}
+                        >
+                          {minutes} min
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
                   {settingsError ? (
                     <p className="text-sm text-rose-300">{settingsError}</p>
                   ) : null}

@@ -24,10 +24,11 @@ type Streamer = {
 
 export type PublicStreamer = Omit<Streamer, "id">;
 
-export type GameStatus = "waiting" | "active";
+export type GameStatus = "waiting" | "active" | "ended";
 
 type GameSettings = {
   showBoundingBoxes: boolean;
+  gameDurationMinutes: number; // Duration in minutes (default 3)
 };
 
 export type PublicGameSettings = GameSettings;
@@ -38,6 +39,7 @@ export type PublicGame = {
   players: PublicPlayer[];
   createdAt: number;
   startedAt?: number;
+  endedAt?: number;
   streamer?: PublicStreamer;
   settings: PublicGameSettings;
 };
@@ -47,6 +49,7 @@ type Game = {
   players: Player[];
   createdAt: number;
   startedAt?: number;
+  endedAt?: number;
   status: GameStatus;
   streamer?: Streamer;
   settings: GameSettings;
@@ -89,6 +92,7 @@ function toPublicGame(game: Game): PublicGame {
     players: game.players.map(toPublicPlayer),
     createdAt: game.createdAt,
     startedAt: game.startedAt,
+    endedAt: game.endedAt,
     streamer: game.streamer
       ? {
           name: game.streamer.name,
@@ -125,6 +129,7 @@ export function createGame(hostNameInput: string | undefined) {
     status: "waiting",
     settings: {
       showBoundingBoxes: true,
+      gameDurationMinutes: 3, // Default 3 minutes
     },
   };
 
@@ -217,6 +222,27 @@ export function startGame(codeInput: string) {
 
   game.status = "active";
   game.startedAt = Date.now();
+
+  return toPublicGame(game);
+}
+
+export function endGame(codeInput: string) {
+  const code = normalizeCode(codeInput);
+  if (!code) {
+    throw new Error("Game code is required.");
+  }
+
+  const game = games.get(code);
+  if (!game) {
+    throw new Error("Game not found.");
+  }
+
+  if (game.status === "ended") {
+    return toPublicGame(game);
+  }
+
+  game.status = "ended";
+  game.endedAt = Date.now();
 
   return toPublicGame(game);
 }

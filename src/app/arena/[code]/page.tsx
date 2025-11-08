@@ -53,6 +53,117 @@ export default function ArenaPage() {
   const [gun1Ammo, setGun1Ammo] = useState(10);
   const [gun2Ammo, setGun2Ammo] = useState(3);
   const [selectedGun, setSelectedGun] = useState<1 | 2>(1);
+  
+  // Sound effects refs
+  const gun1SoundRef = useRef<HTMLAudioElement | null>(null);
+  const gun2SoundRef = useRef<HTMLAudioElement | null>(null);
+  const hitSoundRef = useRef<HTMLAudioElement | null>(null);
+  const emptyClickSoundRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  
+  // Initialize sound effects
+  useEffect(() => {
+    // Using Web Audio API with oscillator for gunshot sounds (no external files needed)
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioContextRef.current = audioContext;
+    
+    // Gun 1 sound - short "pew"
+    const createGun1Sound = () => {
+      // Resume audio context on mobile (required for iOS/Android)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    };
+    
+    // Gun 2 sound - deeper "boom"
+    const createGun2Sound = () => {
+      // Resume audio context on mobile (required for iOS/Android)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.2);
+      
+      gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2);
+    };
+    
+    // Hit sound - high pitched "ding"
+    const createHitSound = () => {
+      // Resume audio context on mobile (required for iOS/Android)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(1500, audioContext.currentTime + 0.05);
+      
+      gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.15);
+    };
+    
+    // Empty click sound - short click
+    const createEmptyClickSound = () => {
+      // Resume audio context on mobile (required for iOS/Android)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+      
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.05);
+    };
+    
+    // Store functions in refs
+    gun1SoundRef.current = { play: createGun1Sound } as any;
+    gun2SoundRef.current = { play: createGun2Sound } as any;
+    hitSoundRef.current = { play: createHitSound } as any;
+    emptyClickSoundRef.current = { play: createEmptyClickSound } as any;
+  }, []);
 
   // Poll game state to get settings and scores (but not ammo - handled client-side)
   useEffect(() => {
@@ -374,7 +485,18 @@ export default function ArenaPage() {
     // Check ammo BEFORE consuming
     if (currentAmmo <= 0) {
       console.log(`[Ammo] No ammo in Gun ${currentGun}! Shot blocked.`);
+      // Play empty click sound
+      if (emptyClickSoundRef.current) {
+        emptyClickSoundRef.current.play();
+      }
       return;
+    }
+    
+    // Play gunshot sound
+    if (currentGun === 1 && gun1SoundRef.current) {
+      gun1SoundRef.current.play();
+    } else if (currentGun === 2 && gun2SoundRef.current) {
+      gun2SoundRef.current.play();
     }
     
     // ALWAYS consume ammo when firing, regardless of hit/miss
@@ -394,6 +516,11 @@ export default function ArenaPage() {
     
     // If we hit someone, award points
     if (didHit && targetColor) {
+      // Play hit sound
+      if (hitSoundRef.current) {
+        hitSoundRef.current.play();
+      }
+      
       try {
         const res = await fetch(`/api/game/${code}/hit`, {
           method: "POST",
@@ -441,6 +568,23 @@ export default function ArenaPage() {
     return query ? `?${query}` : "";
   }, [isHost, playerName]);
 
+  // Calculate player placement and stats
+  const playerPlacement = useMemo(() => {
+    if (!game?.players) return null;
+    const sortedPlayers = [...game.players].sort((a, b) => {
+      if (b.score === a.score) return a.joinedAt - b.joinedAt;
+      return b.score - a.score;
+    });
+    const playerIndex = sortedPlayers.findIndex(
+      (p) => p.name.toLowerCase() === playerName.toLowerCase()
+    );
+    return {
+      place: playerIndex + 1,
+      total: sortedPlayers.length,
+      score: sortedPlayers[playerIndex]?.score ?? 0,
+    };
+  }, [game, playerName]);
+
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-black text-slate-100">
       <header className="flex items-center justify-between px-6 py-5">
@@ -462,22 +606,62 @@ export default function ArenaPage() {
           Back to lobby
         </Link>
       </header>
-      <main className="relative flex flex-1 flex-col items-center justify-center px-6 pb-8">
-        <div className="relative w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-black/40 shadow-2xl">
-          {/* MediaPipe CameraFeed with person detection */}
-          <CameraFeed
-            onHit={handleHit}
-            showBoundingBoxes={game?.settings?.showBoundingBoxes ?? true}
-            isActive={true}
-            canvasRef={canvasRef}
-            onCameraReady={() => setCameraReady(true)}
-          />
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-6 text-sm text-slate-200">
-            {statusMessage}
+      
+      {game?.status === "ended" ? (
+        /* End Game Screen */
+        <main className="relative flex flex-1 flex-col items-center justify-center px-6 pb-8">
+          <div className="w-full max-w-2xl text-center">
+            <h2 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-fuchsia-400 to-cyan-400 mb-4">
+              Game Over!
+            </h2>
+            <p className="text-lg text-slate-300 mb-8">Match complete</p>
+            
+            {playerPlacement && (
+              <>
+                <div className="mb-8 p-8 rounded-3xl border-2 border-cyan-500/40 bg-cyan-500/10">
+                  <p className="text-sm uppercase tracking-[0.3em] text-cyan-300 mb-2">Your Placement</p>
+                  <p className="text-6xl font-bold text-white mb-2">
+                    #{playerPlacement.place}
+                  </p>
+                  <p className="text-sm text-slate-400">
+                    out of {playerPlacement.total} {playerPlacement.total === 1 ? 'player' : 'players'}
+                  </p>
+                </div>
+                
+                <div className="p-6 rounded-2xl bg-white/5 mb-6">
+                  <p className="text-sm uppercase tracking-[0.3em] text-slate-400 mb-2">Final Score</p>
+                  <p className="text-4xl font-bold text-emerald-300">{playerPlacement.score} points</p>
+                </div>
+              </>
+            )}
+            
+            <Link
+              href="/"
+              className="inline-block rounded-full border border-white/20 bg-gradient-to-r from-rose-500 via-fuchsia-500 to-sky-500 px-8 py-4 text-lg font-bold text-white transition hover:scale-105"
+            >
+              Return to Menu
+            </Link>
           </div>
-        </div>
-      </main>
-      <footer className="sticky bottom-0 flex flex-col items-center gap-4 bg-gradient-to-t from-black/80 via-black/60 to-transparent pb-10 pt-6 px-6">
+        </main>
+      ) : (
+        /* Active Game Screen */
+        <>
+          <main className="relative flex flex-1 flex-col items-center justify-center px-6 pb-8">
+            <div className="relative w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-black/40 shadow-2xl">
+              {/* MediaPipe CameraFeed with person detection */}
+              <CameraFeed
+                onHit={handleHit}
+                showBoundingBoxes={game?.settings?.showBoundingBoxes ?? true}
+                isActive={true}
+                canvasRef={canvasRef}
+                onCameraReady={() => setCameraReady(true)}
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-6 text-sm text-slate-200">
+                {statusMessage}
+              </div>
+            </div>
+          </main>
+          <footer className="sticky bottom-0 flex flex-col items-center gap-4 bg-gradient-to-t from-black/80 via-black/60 to-transparent pb-10 pt-6 px-6">
         {/* Ammo and Gun Controls */}
         <div className="flex items-center gap-6">
           {/* Gun selector buttons */}
@@ -546,6 +730,11 @@ export default function ArenaPage() {
         <button
           type="button"
           onClick={() => {
+            // Resume audio context on first interaction (mobile fix)
+            if (audioContextRef.current?.state === 'suspended') {
+              audioContextRef.current.resume();
+            }
+            
             const currentAmmo = selectedGun === 1 ? gun1Ammo : gun2Ammo;
             if (currentAmmo <= 0) return;
             
@@ -565,7 +754,9 @@ export default function ArenaPage() {
           Fire
           <span className="absolute inset-1 rounded-full border border-white/20" />
         </button>
-      </footer>
+          </footer>
+        </>
+      )}
     </div>
   );
 }

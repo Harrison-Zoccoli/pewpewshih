@@ -11,12 +11,17 @@ type Player = {
   score: number;
 };
 
-type GameStatus = "waiting" | "active";
+type GameStatus = "waiting" | "active" | "ended";
 
 type GamePayload = {
   code: string;
   status: GameStatus;
   players: Player[];
+  startedAt?: number;
+  endedAt?: number;
+  settings?: {
+    gameDurationMinutes: number;
+  };
   streamer?: {
     name: string;
     joinedAt: number;
@@ -72,6 +77,7 @@ export default function StreamerDashboardPage() {
   const [isLeaving, setIsLeaving] = useState(false);
   const [socketStatus, setSocketStatus] = useState<string | null>(null);
   const [feedVersion, setFeedVersion] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null); // in seconds
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const peerConnectionsRef = useRef(new Map<string, RTCPeerConnection>());
@@ -239,6 +245,36 @@ export default function StreamerDashboardPage() {
       void fetch(`/api/game/${code}/streamer`, { method: "DELETE" }).catch(() => undefined);
     };
   }, [code]);
+  
+  // Timer countdown effect
+  useEffect(() => {
+    if (!game || game.status !== "active" || !game.startedAt || !game.settings) {
+      setTimeRemaining(null);
+      return;
+    }
+    
+    const updateTimer = () => {
+      const now = Date.now();
+      const elapsedMs = now - game.startedAt!;
+      const durationMs = game.settings!.gameDurationMinutes * 60 * 1000;
+      const remainingMs = Math.max(0, durationMs - elapsedMs);
+      const remainingSec = Math.ceil(remainingMs / 1000);
+      
+      setTimeRemaining(remainingSec);
+      
+      // Auto-end game when time is up
+      if (remainingSec <= 0 && game.status === "active") {
+        fetch(`/api/game/${code}/end`, { method: "POST" })
+          .then(() => fetchGame())
+          .catch((err) => console.error("Failed to end game:", err));
+      }
+    };
+    
+    updateTimer(); // Initial update
+    const timerInterval = setInterval(updateTimer, 1000); // Update every second
+    
+    return () => clearInterval(timerInterval);
+  }, [game, code, fetchGame]);
 
   useEffect(() => {
     if (!code || !name) {
@@ -417,6 +453,26 @@ export default function StreamerDashboardPage() {
       <main className="flex-1 px-4 pb-4 overflow-hidden min-h-0">
         <div className="flex h-full gap-4 flex-col lg:flex-row">
           <section className="flex flex-col rounded-2xl border border-white/5 bg-black/40 p-4 shadow-2xl lg:w-[30%] overflow-hidden min-h-0">
+            {/* Timer Display */}
+            {game?.status === "active" && timeRemaining !== null && (
+              <div className="mb-4 flex items-center justify-center flex-shrink-0">
+                <div className={`text-center rounded-xl border-2 px-6 py-3 ${
+                  timeRemaining <= 60 
+                    ? 'border-rose-500/60 bg-rose-500/20 animate-pulse' 
+                    : 'border-emerald-500/40 bg-emerald-500/10'
+                }`}>
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-300 mb-1">
+                    Time Remaining
+                  </p>
+                  <p className={`text-4xl font-bold font-mono ${
+                    timeRemaining <= 60 ? 'text-rose-300' : 'text-emerald-300'
+                  }`}>
+                    {Math.floor(timeRemaining / 60)}:{String(timeRemaining % 60).padStart(2, '0')}
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <div className="flex items-center justify-between gap-4 flex-shrink-0">
               <h2 className="text-xl font-semibold text-white">Leaderboard</h2>
               <span className="text-xs uppercase tracking-[0.3em] text-slate-400">
@@ -456,13 +512,49 @@ export default function StreamerDashboardPage() {
           </section>
 
           <section className="flex flex-col rounded-2xl border border-white/5 bg-black/40 p-4 shadow-2xl flex-1 overflow-hidden min-h-0">
-            <div className="flex items-center justify-between gap-4 flex-shrink-0">
-              <h2 className="text-xl font-semibold text-white">Live feeds</h2>
-              <p className="text-[0.6rem] uppercase tracking-[0.3em] text-slate-400">
-                {socketStatus ?? "Waiting for players"}
-              </p>
-            </div>
-            <div
+            {game?.status === "ended" ? (
+              /* End Game Screen */
+              <div className="flex-1 flex flex-col items-center justify-center overflow-auto">
+                <div className="text-center max-w-2xl p-4">
+                  <h2 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-fuchsia-400 to-cyan-400 mb-4">
+                    Game Over!
+                  </h2>
+                  <p className="text-lg text-slate-300 mb-8">Match complete</p>
+                  
+                  {game.players.length > 0 && (
+                    <>
+                      <div className="mb-8 p-6 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10">
+                        <p className="text-sm uppercase tracking-[0.3em] text-emerald-300 mb-2">Winner</p>
+                        <p className="text-4xl font-bold text-white">{game.players[0].name}</p>
+                        <p className="text-2xl text-emerald-200 mt-2">{game.players[0].score} points</p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <p className="text-sm uppercase tracking-[0.3em] text-slate-400 mb-4">Final Scores</p>
+                        {game.players.map((player, index) => (
+                          <div key={player.name} className="flex items-center justify-between p-4 rounded-xl bg-white/5">
+                            <div className="flex items-center gap-4">
+                              <span className="text-2xl font-bold text-slate-400">#{index + 1}</span>
+                              <span className="text-lg text-white">{player.name}</span>
+                            </div>
+                            <span className="text-xl font-bold text-emerald-300">{player.score} pts</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Live Feeds Section */
+              <>
+                <div className="flex items-center justify-between gap-4 flex-shrink-0">
+                  <h2 className="text-xl font-semibold text-white">Live feeds</h2>
+                  <p className="text-[0.6rem] uppercase tracking-[0.3em] text-slate-400">
+                    {socketStatus ?? "Waiting for players"}
+                  </p>
+                </div>
+                <div
               className="mt-4 grid flex-1 gap-3 overflow-auto content-start min-h-0 justify-items-center"
               data-feed-version={feedVersion}
               style={{
@@ -524,7 +616,9 @@ export default function StreamerDashboardPage() {
                   Waiting for players to join.
                 </div>
               ) : null}
-            </div>
+                </div>
+              </>
+            )}
           </section>
         </div>
       </main>
