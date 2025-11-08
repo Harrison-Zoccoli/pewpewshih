@@ -1,64 +1,130 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+export default function HomePage() {
+  const router = useRouter();
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCreateGame = async () => {
+    setError(null);
+
+    const defaultName = "Laser Captain";
+    const input =
+      typeof window !== "undefined"
+        ? window.prompt("Host name", defaultName) ?? ""
+        : "";
+    const hostName = input.trim();
+
+    if (!hostName) {
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const response = await fetch("/api/game/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ hostName }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to create game.");
+      }
+
+      router.push(
+        `/lobby/${data.code}?name=${encodeURIComponent(hostName)}&host=1`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Something broke.";
+      setError(message);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex min-h-screen flex-col items-center bg-gradient-to-b from-slate-950 via-slate-900 to-black px-4 py-20 text-slate-100">
+      <main className="w-full max-w-4xl space-y-16">
+        <header className="text-center sm:text-left">
+          <p className="text-sm uppercase tracking-[0.6em] text-slate-400">
+            Pew Pew Labs
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          <h1 className="mt-6 text-4xl font-black leading-tight text-slate-50 sm:text-6xl">
+            Laser tag powered by AI vision.
+          </h1>
+          <p className="mt-4 text-lg text-slate-300 sm:text-xl">
+            Pew Pew uses real-time computer vision to track every hit, every
+            player, and every brag-worthy moment. Host a lobby, invite your
+            squad, and get ready to duel.
+          </p>
+          <div className="mt-10 grid gap-4 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={handleCreateGame}
+              disabled={isCreating}
+              className="w-full rounded-full bg-emerald-500 px-8 py-3 text-base font-semibold text-emerald-950 transition hover:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              {isCreating ? "Spinning up lobby..." : "Make a game"}
+            </button>
+            <Link
+              href="/join"
+              className="w-full rounded-full border border-slate-700/60 px-8 py-3 text-base font-semibold text-slate-200 transition hover:border-slate-500 hover:ring-2 hover:ring-slate-500/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-200 sm:w-auto"
+            >
+              Join with a code
+            </Link>
+            <Link
+              href="/stream"
+              className="w-full rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 px-8 py-3 text-base font-semibold text-fuchsia-100 transition hover:border-fuchsia-300 hover:bg-fuchsia-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-200 sm:w-auto"
+            >
+              Join as streamer
+            </Link>
+          </div>
+          {error ? (
+            <p className="mt-4 text-sm text-rose-300">
+              {error}
+            </p>
+          ) : null}
+        </header>
+        <section className="grid gap-6 sm:grid-cols-3">
+          <div className="rounded-2xl border border-white/5 bg-white/5 p-6 backdrop-blur">
+            <p className="text-sm uppercase tracking-[0.4em] text-emerald-300">
+              Vision
+            </p>
+            <p className="mt-2 text-base text-slate-200">
+              AI-assisted targeting boxes keep every duel fair and every shot
+              accounted for.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-white/5 p-6 backdrop-blur">
+            <p className="text-sm uppercase tracking-[0.4em] text-sky-300">
+              Instant lobbies
+            </p>
+            <p className="mt-2 text-base text-slate-200">
+              Host a match in seconds and share the auto-generated code with
+              your crew.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-white/5 p-6 backdrop-blur">
+            <p className="text-sm uppercase tracking-[0.4em] text-fuchsia-300">
+              Live scoreboard
+            </p>
+            <p className="mt-2 text-base text-slate-200">
+              Watch players join in real time and get ready for the showdown.
+            </p>
+          </div>
+        </section>
+        <footer className="text-center text-xs text-slate-500 sm:text-left">
+          Prototype built for hackathons. Hardware, computer vision, and battle
+          mechanics coming soon.
+        </footer>
       </main>
     </div>
   );
