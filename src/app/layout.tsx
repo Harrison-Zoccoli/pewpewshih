@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pew Pew",
+  title: "Phone Tag Labs",
   description: "Laser tag reimagined with AI-powered vision.",
 };
 

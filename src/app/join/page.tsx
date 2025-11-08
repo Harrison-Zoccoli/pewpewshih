@@ -57,7 +57,7 @@ export default function JoinPage() {
           ← Back to landing
         </Link>
         <h1 className="mt-6 text-3xl font-bold text-white sm:text-4xl">
-          Join a Pew Pew lobby
+          Join a Phone Tag Labs lobby
         </h1>
         <p className="mt-2 text-sm text-slate-300">
           Ask the host for the lobby code, enter your callsign, and we will drop

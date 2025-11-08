@@ -589,9 +589,9 @@ export default function ArenaPage() {
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-black text-slate-100">
       <header className="flex items-center justify-between px-6 py-5">
         <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
-            Pew Pew Arena
-          </p>
+              <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
+                Phone Tag Labs Arena
+              </p>
           <h1 className="text-2xl font-bold text-white">
             {playerName || (isHost ? "Host" : "Player")}
           </h1>

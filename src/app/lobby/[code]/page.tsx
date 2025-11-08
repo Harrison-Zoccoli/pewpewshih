@@ -237,9 +237,9 @@ export default function LobbyPage() {
 
   const lobbyMessage = useMemo(() => {
     if (fetchState === "loading") return "Setting up your lobby...";
-    if (fetchState === "missing") return "We couldn’t find that lobby.";
+    if (fetchState === "missing") return "We couldn't find that lobby.";
     if (fetchState === "error") return "Connection hiccup. Trying again.";
-    if (gameStatus === "active") return "Booting up Pew Pew HUD...";
+    if (gameStatus === "active") return "Booting up Phone Tag Labs HUD...";
     return isHost ? "Share the code and wait for your squad." : "Hang tight while everyone gears up.";
   }, [fetchState, gameStatus, isHost]);
 
@@ -404,7 +404,7 @@ export default function LobbyPage() {
                 <>
                   <p className="text-base text-emerald-100">
                     Ready to battle? Launching the match will transport every
-                    player into their Pew Pew HUD.
+                    player into their Phone Tag Labs HUD.
                   </p>
                   <button
                     type="button"
