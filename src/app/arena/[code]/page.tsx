@@ -611,7 +611,7 @@ export default function ArenaPage() {
         /* End Game Screen */
         <main className="relative flex flex-1 flex-col items-center justify-center px-6 pb-8">
           <div className="w-full max-w-2xl text-center">
-            <h2 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-fuchsia-400 to-cyan-400 mb-4">
+            <h2 className="text-5xl font-bold text-fuchsia-500/70 mb-4">
               Game Over!
             </h2>
             <p className="text-lg text-slate-300 mb-8">Match complete</p>
@@ -637,7 +637,7 @@ export default function ArenaPage() {
             
             <Link
               href="/"
-              className="inline-block rounded-full border border-white/20 bg-gradient-to-r from-rose-500 via-fuchsia-500 to-sky-500 px-8 py-4 text-lg font-bold text-white transition hover:scale-105"
+              className="inline-block rounded-full bg-fuchsia-500/30 to-sky-500 px-8 py-4 text-lg font-bold text-white transition hover:scale-105"
             >
               Return to Menu
             </Link>

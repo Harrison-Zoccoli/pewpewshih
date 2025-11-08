@@ -52,7 +52,7 @@ export default function StreamerJoinPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-black px-4 py-20 text-slate-100">
-      <main className="w-full max-w-3xl rounded-3xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-12 shadow-2xl backdrop-blur">
+      <main className="w-full max-w-3xl rounded-3xl  bg-fuchsia-500/10 p-12 shadow-2xl backdrop-blur">
         <Link href="/" className="text-sm text-slate-300 hover:text-white">
           ← Back to landing
         </Link>
@@ -79,7 +79,7 @@ export default function StreamerJoinPage() {
               placeholder="AFMSZ"
               autoComplete="off"
               maxLength={5}
-              className="mt-2 w-full rounded-xl border border-fuchsia-500/40 bg-black/40 px-4 py-3 text-lg uppercase tracking-[0.3em] text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-300/60"
+              className="mt-2 w-full rounded-xl  bg-black/40 px-4 py-3 text-lg uppercase tracking-[0.3em] text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-300/60"
               required
             />
           </div>
@@ -97,7 +97,7 @@ export default function StreamerJoinPage() {
               onChange={(event) => setName(event.target.value)}
               placeholder="Control Booth"
               maxLength={32}
-              className="mt-2 w-full rounded-xl border border-fuchsia-500/40 bg-black/40 px-4 py-3 text-lg text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-300/60"
+              className="mt-2 w-full rounded-xl bg-black/40 px-4 py-3 text-lg text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-300/60"
               required
             />
           </div>
@@ -107,7 +107,7 @@ export default function StreamerJoinPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="sm:col-span-2 mt-2 rounded-full bg-gradient-to-r from-fuchsia-400 to-sky-400 px-8 py-3 text-base font-semibold uppercase tracking-[0.4em] text-slate-950 shadow-lg shadow-fuchsia-500/40 transition hover:scale-[1.01] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="sm:col-span-2 mt-2 rounded-full bg-fuchsia-300/40 px-8 py-3 text-base font-semibold uppercase tracking-[0.4em] text-white shadow-lg shadow-fuchsia-500/40 transition hover:scale-[1.01] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? "Connecting..." : "Enter control booth"}
           </button>

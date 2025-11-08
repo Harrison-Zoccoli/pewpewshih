@@ -307,7 +307,7 @@ export default function LobbyPage() {
 
         <section className="rounded-3xl border border-white/5 bg-white/5 p-10 shadow-xl backdrop-blur">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold text-white">Crew manifest</h2>
+            <h2 className="text-2xl font-semibold text-white">Players</h2>
             <span className="text-sm text-slate-400">
               {players.length} {players.length === 1 ? "player" : "players"}
             </span>

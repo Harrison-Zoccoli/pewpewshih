@@ -525,14 +525,14 @@ export default function StreamerDashboardPage() {
               /* End Game Screen */
               <div className="flex-1 flex flex-col items-center justify-center overflow-auto">
                 <div className="text-center max-w-2xl p-4">
-                  <h2 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-fuchsia-400 to-cyan-400 mb-4">
+                  <h2 className="text-5xl font-bold  text-fuchsia-400  mb-4">
                     Game Over!
                   </h2>
                   <p className="text-lg text-slate-300 mb-8">Match complete</p>
                   
                   {game.players.length > 0 && (
                     <>
-                      <div className="mb-8 p-6 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10">
+                      <div className="mb-8 p-6 rounded-2xl bg-emerald-500/20">
                         <p className="text-sm uppercase tracking-[0.3em] text-emerald-300 mb-2">Winner</p>
                         <p className="text-4xl font-bold text-white">{game.players[0].name}</p>
                         <p className="text-2xl text-emerald-200 mt-2">{game.players[0].score} points</p>
