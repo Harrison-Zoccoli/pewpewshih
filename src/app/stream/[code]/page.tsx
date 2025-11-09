@@ -58,6 +58,7 @@ type InboundMessage =
   | { type: "offer"; name: string; offer: RTCSessionDescriptionInit }
   | { type: "candidate"; name: string; candidate: RTCIceCandidateInit }
   | { type: "player-left"; name: string }
+  | { type: "score-update"; playerName: string; score: number; timestamp: number }
   | { type: "error"; message: string };
 
 const ICE_SERVERS: RTCIceServer[] = [
@@ -338,6 +339,31 @@ export default function StreamerDashboardPage() {
           }
           case "player-left": {
             closePeerConnection(payload.name);
+            break;
+          }
+          case "score-update": {
+            // Real-time score update from player
+            console.log(`[WebSocket] Score update received: ${payload.playerName} -> ${payload.score}`);
+            setGame((prevGame) => {
+              if (!prevGame) return prevGame;
+              
+              // Update the specific player's score
+              const updatedPlayers = prevGame.players.map((player) =>
+                player.name.toLowerCase() === payload.playerName.toLowerCase()
+                  ? { ...player, score: payload.score }
+                  : player
+              );
+              
+              // Re-sort players by score (descending)
+              const sortedPlayers = updatedPlayers.sort((a, b) => {
+                if (b.score === a.score) {
+                  return a.joinedAt - b.joinedAt;
+                }
+                return b.score - a.score;
+              });
+              
+              return { ...prevGame, players: sortedPlayers };
+            });
             break;
           }
           case "error": {

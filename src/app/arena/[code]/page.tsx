@@ -15,7 +15,8 @@ type OutboundMessage =
       name: string;
       candidate: RTCIceCandidateInit;
     }
-  | { type: "leave"; code: string; name: string };
+  | { type: "leave"; code: string; name: string }
+  | { type: "score-update"; score: number };
 
 type InboundMessage =
   | { type: "registered"; role: "player"; streamerReady?: boolean }
@@ -536,6 +537,16 @@ export default function ArenaPage() {
           if (player) {
             console.log(`[Ammo] Hit confirmed! Score: ${player.score}`);
             setPlayerScore(player.score);
+            
+            // Broadcast score update via WebSocket for real-time leaderboard
+            const socket = wsRef.current;
+            if (socket && socket.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({ 
+                type: "score-update", 
+                score: player.score 
+              }));
+              console.log(`[WebSocket] Broadcasted score update: ${player.score}`);
+            }
           }
         } else {
           const errorData = await res.json();

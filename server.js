@@ -231,6 +231,40 @@ function handleMessage(socket, raw, state) {
       cleanupConnection(state.code, state.role, state.name, socket);
       break;
     }
+    case 'score-update': {
+      if (state.role !== 'player') {
+        console.log(`[Signaling] Score update from ${state.name} ignored - not a player`);
+        return;
+      }
+      console.log(`[Signaling] Broadcasting score update from player ${state.name} in game ${state.code}: ${parsed.score} points`);
+      
+      // Broadcast score update to streamer
+      if (room.streamer && room.streamer.readyState === 1) {
+        room.streamer.send(
+          JSON.stringify({
+            type: 'score-update',
+            playerName: state.name,
+            score: parsed.score,
+            timestamp: Date.now()
+          }),
+        );
+      }
+      
+      // Also broadcast to all other players in the room (for their own scoreboards if needed)
+      room.players.forEach((player) => {
+        if (player.name !== state.name && player.socket.readyState === 1) {
+          player.socket.send(
+            JSON.stringify({
+              type: 'score-update',
+              playerName: state.name,
+              score: parsed.score,
+              timestamp: Date.now()
+            }),
+          );
+        }
+      });
+      break;
+    }
     default:
       console.log(`[Signaling] Unknown message type: ${parsed.type} from ${state.name}`);
       break;
